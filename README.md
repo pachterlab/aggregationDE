@@ -1,5 +1,3 @@
-Written by Lynn Yi on Sep 17, 2017
-
 This repository contains the scripts and software for reproducing the results and figures of the paper "Gene-level differential analysis at transcript-level resolution" by Lynn Yi, Harold Pimentel, Nicolas L Bray and Lior Pachter. The code can also be used to apply the aggregation methods described in the paper to new datasets. The software in the repository was written by Lynn Yi. 
 
 R/Snakefile is an example pipeline for downloading fastq files, performing pseudoalignment, and bootstraping on TCCs. The remaining processes for calling sleuth and aggregating p-values are performed in the R scripts tcc_pipeline.R and transcript_pipeline.R
