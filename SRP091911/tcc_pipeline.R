@@ -35,8 +35,6 @@ names <- s2c$Run_s
 paths <- file.path(base_path, '/sleuth_tcc/', names, 'abundance.h5')
 s2c$sample <- names
 s2c$path <- paths
-#s2c$gate <- as.numeric(s2c$stretch)*as.numeric(s2c$drug)
-#print(s2c$gate)
 
 filter_func <- function(row)
 {
@@ -56,9 +54,7 @@ head(sleuth_table)
 saveRDS(sleuth_table, file.path(base_path, 'sleuth_tcc_table.rds'))
 
 print('starting maps')
-ptm <- proc.time()
-tcc2genemap <- make_tcc_to_gene_map2(transcripts, ec_map)
-proc.time() - ptm
+tcc2genemap <- make_tcc_to_gene_map(transcripts, ec_map)
 
 tcc_table <- data.frame(genes = tcc2genemap, sleuth_pval = sleuth_table$pval, meancounts = colMeans(df))
 saveRDS(tcc_table, file.path(base_path, 'tcc_table.rds'))

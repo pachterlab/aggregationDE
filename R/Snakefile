@@ -48,8 +48,7 @@ rule quant:
 
 rule pseudoquant:
 	input:
-		expand(file_path + '{sample}.fastq', sample=SAMPLES),
-		'/home/lynnyi/kallisto_linux-v0.42.5/kallisto'
+		expand(file_path + '{sample}.fastq', sample=SAMPLES)
 	output:
 		file_path + '/pseudoquant/matrix.ec',
 		file_path + '/pseudoquant/matrix.tsv'
@@ -60,8 +59,8 @@ rule pseudoquant:
 	shell:
 		"""
 		mkdir -p {params.out_dir} 
-		python /home/lynnyi/TCC/make_batch_single.py {params.directory} {params.directory}
-		/home/lynnyi/kallisto_linux-v0.42.5/kallisto pseudo --single -l 100 -s 70 -t 10 -i ~/indices/Mouse.rel88.kallisto.index -o {params.out_dir} -b {params.batchfile}
+		python make_batch_single.py {params.directory} {params.directory}
+		kallisto pseudo --single -l 100 -s 70 -t 10 -i ~/indices/Mouse.rel88.kallisto.index -o {params.out_dir} -b {params.batchfile}
 		"""
 
 rule bootstrap_tccs:
@@ -75,6 +74,6 @@ rule bootstrap_tccs:
 	shell:
 		"""
 		mkdir -p {params.directory}
-		Rscript /home/lynnyi/TCC/tcc2bootstrap2.R {params.tcc_path} {params.directory} 
+		Rscript tcc2bootstrap2.R {params.tcc_path} {params.directory} 
 		"""
 

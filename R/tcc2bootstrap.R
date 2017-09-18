@@ -11,6 +11,7 @@ args <- commandArgs(TRUE)
 tcc_path <- args[[1]]
 directory <- args[[2]]
 
+#extracts sample names from the first line of TCC matrx
 sample_names <- readLines(tcc_path, n=1)
 sample_names <- strsplit(sample_names, '\t')
 ample_names <- sample_names[-1]
@@ -18,6 +19,7 @@ print(sample_names)
 print(length(sample_names))
 
 tccs <- scan(tcc_path, skip=1, what = numeric(), sep='\t')
+#number of samples plus 1
 tccs <- matrix(tccs, nrow=25)
 tccs <- tccs[-1,]
 print(dim(tccs))

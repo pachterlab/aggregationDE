@@ -1,0 +1,11 @@
+Run_s	source_name_s	stretch	drug
+SRR4436884	Monolayers exposed to 25% surface area change with cutom built biaxial cyclic (15/min) stetcher for 6 hours	stretch	nodrug
+SRR4436885	Monolayers exposed to 25% surface area change with cutom built biaxial cyclic (15/min) stetcher for 6 hours	stretch	nodrug
+SRR4436886	Monolayers exposed to 25% surface area change with cutom built biaxial cyclic (15/min) stetcher for 6 hours	stretch	nodrug
+SRR4436887	Monolayers exposed to 25% surface area change with cutom built biaxial cyclic (15/min) stetcher for 6 hours	stretch	nodrug
+SRR4436888	Monolayers exposed to 25% surface area change with cutom built biaxial cyclic (15/min) stetcher for 6 hours	stretch	nodrug
+SRR4436889	unstretched monolayers	nostretch	nodrug
+SRR4436890	unstretched monolayers	nostretch	nodrug
+SRR4436891	unstretched monolayers	nostretch	nodrug
+SRR4436892	unstretched monolayers	nostretch	nodrug
+SRR4436893	unstretched monolayers	nostretch	nodrug

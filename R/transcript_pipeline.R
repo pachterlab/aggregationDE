@@ -8,7 +8,8 @@ base_path <- '/home/lynnyi/SRP091911'
 print('reading transcript_gene map')
 transcripts <- read.table('/home/lynnyi/transcriptomes/Rattus_norvegcius.Rnor_6.0.transcripts', stringsAsFactors=FALSE)
 colnames(transcripts) <- c('target_id', 'genes')
-#transcripts$target_id <- gsub('\\..*', '', transcripts$target_id)
+#remove everything after '.'
+transcripts$target_id <- gsub('\\..*', '', transcripts$target_id)
 transcripts$genes <- gsub('\\..*', '', transcripts$genes)
 
 s2c <- read.table(file.path(base_path,'/simple_sample_table.txt'), sep = '\t', header=TRUE, stringsAsFactors=FALSE)

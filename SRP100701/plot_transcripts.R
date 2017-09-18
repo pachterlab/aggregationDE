@@ -18,6 +18,7 @@ colnames(t2g) <- c('target_id', 'genes')
 gene_pipeline_results <- select(gene_pipeline_results, target_id, pval, qval)
 results <- merge(gene_pipeline_results, tx_pipeline_results, by.x='target_id', by.y ='genes', all=TRUE)
 
+
 get_obs <- function(obs_counts, sleuth_table, transcripts, condition1, condition2, gene_name)
 {
 

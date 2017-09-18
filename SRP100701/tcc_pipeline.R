@@ -53,14 +53,12 @@ head(sleuth_table)
 saveRDS(sleuth_table, file.path(base_path, 'sleuth_tcc_table.rds'))
 
 print('starting maps')
-ptm <- proc.time()
-tcc2genemap <- make_tcc_to_gene_map2(transcripts, ec_map)
-proc.time() - ptm
-
+#tcc2genemap returns names of genes (if unambiguous mapping) for each TCC
+tcc2genemap <- make_tcc_to_gene_map(transcripts, ec_map)
 tcc_table <- data.frame(genes = tcc2genemap, sleuth_pval = sleuth_table$pval, meancounts = colMeans(df))
 saveRDS(tcc_table, file.path(base_path, 'tcc_table.rds'))
 
-#doing gene level DE
+#doing gene level DE by aggregating p-values
 gene_de_table <- tcc_table %>% group_by(genes) %>%
 		summarise(pval = lancaster(sleuth_pval, meancounts))
 gene_de_table <- gene_de_table[-1,]
