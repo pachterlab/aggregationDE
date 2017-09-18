@@ -1,0 +1,80 @@
+
+#file_path = '/home/lynnyi/SRP100701/'
+#SAMPLES = ['SRR5285036','SRR5285037','SRR5285038','SRR5285039','SRR5285040','SRR5285041','SRR5285042','SRR5285043','SRR5285044','SRR5285045','SRR5285046','SRR5285047','SRR5285048','SRR5285049','SRR5285050','SRR5285051','SRR5285052','SRR5285053','SRR5285054','SRR5285055','SRR5285056','SRR5285057','SRR5285058','SRR5285059']
+#define file_path and samples
+
+rule all:
+	input:
+		expand(file_path + '{sample}.fastq', sample=SAMPLES),
+		expand(file_path + '/kallisto/{sample}/abundance.h5', sample=SAMPLES),
+		file_path + '/pseudoquant//matrix.tsv',
+		expand(file_path + '/sleuth_tcc/{sample}/abundance.h5', sample=SAMPLES)
+
+rule get_files:
+	output:
+		file_path + '{sample}.sra'
+	params:
+		sample = '{sample}'
+	shell:
+		"""
+		wget ftp://ftp-trace.ncbi.nlm.nih.gov/sra/sra-instant/reads/ByStudy/sra/SRP/SRP100/SRP100701/{params.sample}/{params.sample}.sra
+		"""
+
+rule fastq:
+	input:
+		file_path + '{sample}.sra'
+	output:
+		file_path + '{sample}.fastq'
+	params:
+		sample = file_path + '{sample}.sra'
+	shell:
+		"""
+		fastq-dump '{params.sample}'		
+		"""
+
+rule quant:
+	input:
+		file_path + '{sample}.fastq'
+	output:
+		file_path + '/kallisto/{sample}/abundance.h5'
+	params:
+		index = '/home/lynnyi/indices/Mouse.rel88.kallisto.index',
+		sample = file_path + '{sample}.fastq',
+		outpath = file_path + '/kallisto/{sample}'
+	shell:
+		"""
+		kallisto quant --single -i {params.index} -o {params.outpath} -l 100 -s 70 -b 30 {params.sample}
+		"""
+
+rule pseudoquant:
+	input:
+		expand(file_path + '{sample}.fastq', sample=SAMPLES),
+		'/home/lynnyi/kallisto_linux-v0.42.5/kallisto'
+	output:
+		file_path + '/pseudoquant/matrix.ec',
+		file_path + '/pseudoquant/matrix.tsv'
+	params:
+		directory = file_path,
+		out_dir = file_path + '/pseudoquant/',
+		batchfile = file_path + '/batchfile.txt'
+	shell:
+		"""
+		mkdir -p {params.out_dir} 
+		python /home/lynnyi/TCC/make_batch_single.py {params.directory} {params.directory}
+		/home/lynnyi/kallisto_linux-v0.42.5/kallisto pseudo --single -l 100 -s 70 -t 10 -i ~/indices/Mouse.rel88.kallisto.index -o {params.out_dir} -b {params.batchfile}
+		"""
+
+rule bootstrap_tccs:
+	input:
+		file_path + '/pseudoquant/matrix.tsv'
+	output:
+		expand(file_path + '/sleuth_tcc/{sample}/abundance.h5', sample=SAMPLES)
+	params:
+		tcc_path = file_path + '/pseudoquant/matrix.tsv',
+		directory = file_path + '/sleuth_tcc/'
+	shell:
+		"""
+		mkdir -p {params.directory}
+		Rscript /home/lynnyi/TCC/tcc2bootstrap2.R {params.tcc_path} {params.directory} 
+		"""
+

@@ -1,0 +1,112 @@
+
+#This Snakefile makes kallisto index, trims poly A reads, pseudoquantify and quantifies reads with kallisto, performs bootstrap on TCCs. This requires downloading of kallisto and fqtrim outside the Snakefile.
+#change to your own path where you want your files to be stored
+file_path = '/home/lynnyi/SRP091911/'
+#change where the transcriptome file is located
+cdna = '/home/lynnyi/transcriptomes/Rattus_norvegicus.Rnor_6.0.cdna.all.fa.gz'
+#change where you want your index to be stored
+index = '/home/lynnyi/indices/rat.6.kallisto.0.43.1.index'
+
+SAMPLES = ['SRR4436884','SRR4436885','SRR4436886','SRR4436887','SRR4436888','SRR4436889','SRR4436890','SRR4436891','SRR4436892','SRR4436893','SRR4436894','SRR4436895','SRR4436896','SRR4436897','SRR4436898','SRR4436899','SRR4436900','SRR4436901','SRR4436902','SRR4436903']
+
+
+rule all:
+	input:
+		expand(file_path + '{sample}.trim', sample=SAMPLES),
+		index,
+		expand(file_path + '/kallisto/{sample}/abundance.h5', sample=SAMPLES),
+		file_path + '/pseudoquant//matrix.tsv',
+		expand(file_path + '/sleuth_tcc/{sample}/abundance.h5', sample=SAMPLES)
+
+rule get_files:
+	output:
+		file_path + '{sample}.sra'
+	params:
+		sample = '{sample}'
+	shell:
+		"""
+		wget ftp://ftp-trace.ncbi.nlm.nih.gov/sra/sra-instant/reads/ByStudy/sra/SRP/SRP091/SRP091911/{params.sample}/{params.sample}.sra
+		"""
+
+rule fastq:
+	input:
+		file_path + '{sample}.sra'
+	output:
+		file_path + '{sample}.fastq'
+	params:
+		sample = file_path + '{sample}.sra'
+	shell:
+		"""
+		fastq-dump '{params.sample}'		
+		"""
+
+rule trim:
+	input:
+		file_path + '{sample}.fastq'
+	output:
+		file_path + '{sample}.trim'
+	params:
+		sample = file_path + '{sample}.fastq'
+	shell:
+		"""
+		fqtrim -o trim {params.sample}
+		"""
+
+rule make_index:
+	input:
+		cdna = cdna
+	output:
+		index
+	params:
+		index = index
+	shell:
+		"""
+		kallisto index -i {params.index} {input.cdna}
+		"""
+
+rule quant:
+	input:
+		sample = file_path + '{sample}.trim',
+		index = index
+	output:
+		file_path + '/kallisto/{sample}/abundance.h5'
+	params:
+		outpath = file_path + '/kallisto/{sample}'
+	shell:
+		"""
+		kallisto quant --single -i {input.index} -o {params.outpath} -l 100 -s 70 -b 30 {input.sample}
+		"""
+
+rule pseudoquant:
+	input:
+		expand(file_path + '{sample}.trim', sample=SAMPLES),
+		index = index
+	output:
+		file_path + '/pseudoquant/matrix.ec',
+		file_path + '/pseudoquant/matrix.tsv'
+	params:
+		directory = file_path,
+		out_dir = file_path + '/pseudoquant/',
+		batchfile = file_path + '/batchfile.txt',
+		batch_script = file_path + '/make_batch_single.py'
+	shell:
+		"""
+		mkdir -p {params.out_dir} 
+		python {params.batch_script} {params.directory} {params.directory}
+		kallisto pseudo --single -l 100 -s 70 -t 10 -i {input.index} -o {params.out_dir} -b {params.batchfile}
+		"""
+
+rule bootstrap_tccs:
+	input:
+		file_path + '/pseudoquant/matrix.tsv',
+	output:
+		expand(file_path + '/sleuth_tcc/{sample}/abundance.h5', sample=SAMPLES)
+	params:
+		tcc_path = file_path + '/pseudoquant/matrix.tsv',
+		directory = file_path + '/sleuth_tcc/'
+	shell:
+		"""
+		mkdir -p {params.directory}
+		Rscript tcc2bootstrap.R {params.tcc_path} {params.directory} 
+		"""
+

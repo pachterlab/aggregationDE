@@ -1,0 +1,88 @@
+
+#This Snakefile redoes the analysis on the simulations and illustrates a basic pipeline for p-value aggregation. First, the RNA-seq reads are pseudoquantified in rule pseudoquant. Bootstraps on TCCs are performed with tcc2bootstrap.R. The pipeline that does the analysis using various aggregation methods are performed using simulation_pipeline.R.  Finally, FDR plots are averaged and plotted with mamabear.R
+
+# Download simulation reads with pachter_lab/sleuth_paper_analysis Snakefile prior to running. Replace hjp_path and base_path with your own paths. 
+
+EXPS = range(1, 21)
+SAMPLES = range(1, 7)
+
+#REPLACE PATHS
+hjp_path = '/home/hjp/sleuth_paper_analysis/geuvadis/sims/gfr_3_3_20_42_2/'
+base_path  = '/home/lynnyi/geuvadis/gfr_3_3_20_42_2/'
+#replace path to kallisto index
+index = '/home/lynnyi/indices/index.idx'
+
+rule all:
+	input:
+		expand(base_path + '/exp_{exp}/matrix.tsv', exp = EXPS),
+		expand(base_path + '/exp_{exp}/summary_table.rds', exp=EXPS),
+
+rule pseudoquant:
+	input:
+		expand(hjp_path + '/exp_{{exp}}/{sample}/sim_{sample}_1.fq.gz', sample = SAMPLES),
+		expand(hjp_path + '/exp_{{exp}}/{sample}/sim_{sample}_2.fq.gz', sample = SAMPLES),
+		index = index
+	output:
+		base_path + '/exp_{exp}/matrix.tsv'
+	params:
+		in_dir = hjp_path + '/exp_{exp}/',
+		directory = base_path + '/exp_{exp}/',
+		batchfile = base_path + '/exp_{exp}/batchfile.txt'
+	shell:
+		"""
+		mkdir -p {params.directory}
+		python make_batch.py {params.in_dir} {params.directory}
+		kallisto pseudo -t 10 -i {input.index} -o {params.directory}  -b {params.batchfile} 
+		"""
+
+rule bootstrap_tccs:
+	input:
+		base_path + '/exp_{exp}/matrix.tsv'
+	output:
+		expand(base_path + '/exp_{{exp}}/sleuth_tcc/{sample}/abundance.h5', sample=SAMPLES)
+	params:
+		experiment = base_path,
+		exp_string = 'exp_{exp}',
+		directory =  base_path + '/exp_{exp}/sleuth_tcc/'
+	shell:
+		"""
+		mkdir -p {params.directory}
+		echo {params.experiment}
+		echo {params.exp_string}
+		Rscript tcc2bootstrap.R {params.experiment} {params.exp_string}
+		"""
+
+
+rule pipeline:
+	input:
+		base_path + '/exp_{exp}/matrix.tsv',
+		expand(hjp_path + '/exp_{{exp}}/{sample}/kallisto/abundance.h5', sample=SAMPLES),
+		expand(base_path + '/exp_{{exp}}/sleuth_tcc/{sample}/abundance.h5', sample= SAMPLES),
+		hjp_path + '/sims.rds'
+	output:
+		base_path + '/exp_{exp}/summary_table.rds'
+	params:
+		bp = base_path,
+		hp = hjp_path,
+		exp_string = 'exp_{exp}',
+		exp_num = '{exp}'
+	shell:
+		"""
+		Rscript sim_pipeline.R {params.bp} {params.hp} {params.exp_string} {params.exp_num} 
+		"""
+
+rule average_fdrs_mama:
+	input:
+		expand(base_path +'/exp_{exp}/summary_table.rds', exp=EXPS)
+	output:
+		base_path + '/mama_plot1.png',
+		base_path + '/mama_plot2.png'
+	params:
+		bp = base_path
+	shell:
+		"""
+		Rscript averaging_fdrs.R {params.bp}
+		Rscript mamabear.R {params.bp}
+		"""
+
+
