@@ -8,19 +8,16 @@
 library(rhdf5)
 
 args <- commandArgs(TRUE)
-tcc_path <- args[[1]]
-directory <- args[[2]]
+experiment <- args[[1]]
+exp_string <- args[[2]]
+print(experiment)
+print(exp_string)
 
-#extracts sample names from the first line of TCC matrx
-sample_names <- readLines(tcc_path, n=1)
-sample_names <- strsplit(sample_names, '\t')
-ample_names <- sample_names[-1]
-print(sample_names)
-print(length(sample_names))
+tcc_path <- file.path(experiment, exp_string, 'matrix.tsv')
+directory <- file.path(experiment, exp_string, 'sleuth_tcc')
 
 tccs <- scan(tcc_path, skip=1, what = numeric(), sep='\t')
-#number of samples plus 1
-tccs <- matrix(tccs, nrow=25)
+tccs <- matrix(tccs, nrow=7)
 tccs <- tccs[-1,]
 print(dim(tccs))
 
@@ -54,7 +51,6 @@ write_h5 <- function(counts, h5file)
 	H5close()
 }
 
-# directory labeled by cell, each with 30 bootstraps
-sapply(1:ncells, function(i) write_h5(tccs[i,], file.path(directory, sample_names[i], 'abundance.h5')))
+sapply(1:ncells, function(i) write_h5(tccs[i,], file.path(directory, i, 'abundance.h5')))
 print('finished making bootstraps for tccs')
 

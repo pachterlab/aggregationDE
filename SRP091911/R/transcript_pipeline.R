@@ -1,8 +1,7 @@
 
 library(sleuth)
-source('../R/aggregation.R')
+source('~/TCC/misc.R')
 
-#change path and transcript to gene mapping table
 base_path <- '/home/lynnyi/SRP091911'
 
 print('reading transcript_gene map')
@@ -11,8 +10,6 @@ colnames(transcripts) <- c('target_id', 'genes')
 #transcripts$target_id <- gsub('\\..*', '', transcripts$target_id)
 transcripts$genes <- gsub('\\..*', '', transcripts$genes)
 
-#now run sleuth pipeline to get transcript-level p-values
-#read table about samples
 s2c <- read.table(file.path(base_path,'/simple_sample_table.txt'), sep = '\t', header=TRUE, stringsAsFactors=FALSE)
 names <- s2c$Run_s
 paths <- file.path(base_path, '/kallisto/', names, 'abundance.h5')

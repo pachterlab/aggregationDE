@@ -1,42 +1,17 @@
 
 library(dplyr)
 
-
-calculate_fdr <- function(true_DE, pvalues, title)
+calculate_fdr <- function(true_DE, qvalues, title)
 {
-	df <- data.frame(true_DE = true_DE, pvalues=pvalues)
-	df <- df[order(df$pvalues), ]
-	total_positive <- sum(true_DE)
-	df <- df %>% group_by(pvalues) %>% summarise( p = sum(true_DE), n = sum(!true_DE), l=n())
-	print(head(df))
-	fdr <- sapply(seq(df$pvalues), function(i) sum(df$n[1:i]) / sum(df$l[1:i]))
-	sensitivity <- sapply(seq(df$pvalues), function(i) sum(df$p[1:i])/total_positive)
-	n_found <- sapply(seq(df$pvalues), function(i) sum(df$p[1:i]))
-	n_de <- sapply(seq(df$pvalues), function(i) sum(df$l[1:i]))
-	five <- min(which(df$pvalues > .05)) -1 
-	ten <- min(which(df$pvalues > .1)) - 1
-	twenty <- min(which(df$pvalues > .2)) -1
-	
-	list(fdr = fdr, sensitivity = sensitivity,
-		n_found = n_found,
-		n_de = n_de,
-		pvalues = df$pvalues,
-		five=five, ten=ten, twenty=twenty, title=title)
-}
-
-calculate_fdr_qval <- function(true_DE, pvalues, qvalues, title)
-{
-	#TODO filter out the NAs so that n_de is capped to filtered
-	df <- data.frame(true_DE = true_DE, pvalues=pvalues, qvalues = qvalues)
-	df <- df[order(df$pvalues), ]
-	#added this line
+	df <- data.frame(true_DE, qvalues)
+	df <- df[order(df$qvalues), ]
 	total_positive <- sum(df$true_DE)
 	total_negative <- nrow(df) - total_positive
-	df <- filter(df, !is.na(df$pvalues))
+	df <- filter(df, !is.na(df$qvalues))
 	print(head(df))
-	fdr <- sapply(seq(df$pvalues), function(i) sum(!df$true_DE[1:i]) / i)
-	sensitivity <- sapply(seq(df$pvalues), function(i) sum(df$true_DE[1:i])/total_positive)
-	n_found <- sapply(seq(df$pvalues), function(i) sum(df$true_DE[1:i]))
+	fdr <- sapply(seq(df$qvalues), function(i) sum(!df$true_DE[1:i]) / i)
+	sensitivity <- sapply(seq(df$qvalues), function(i) sum(df$true_DE[1:i])/total_positive)
+	n_found <- sapply(seq(df$qvalues), function(i) sum(df$true_DE[1:i]))
 	n_de <- (1:nrow(df))
 	five <- min(which(df$qvalues > .05)) -1 
 	ten <- min(which(df$qvalues > .1)) - 1
@@ -47,55 +22,29 @@ calculate_fdr_qval <- function(true_DE, pvalues, qvalues, title)
 		n_de = n_de,
 		total_positive = total_positive,
 		total_negative = total_negative, 
-		pvalues = df$qvalues,
-		five=five, ten=ten, twenty=twenty, title=title)
-}
-
-
-calculate_fdr_pval <- function(true_DE, pvalues, title)
-{
-	#TODO filter out the NAs so that n_de is capped to filtered
-	df <- data.frame(true_DE = true_DE, pvalues=pvalues)
-	df <- df[order(df$pvalues), ]
-	#added this line
-	total_positive <- sum(df$true_DE)
-	total_negative <- nrow(df) - total_positive
-	df <- filter(df, !is.na(df$pvalues))
-	print(head(df))
-	fdr <- sapply(seq(df$pvalues), function(i) sum(!df$true_DE[1:i]) / i)
-	sensitivity <- sapply(seq(df$pvalues), function(i) sum(df$true_DE[1:i])/total_positive)
-	n_found <- sapply(seq(df$pvalues), function(i) sum(df$true_DE[1:i]))
-	n_de <- (1:nrow(df))
-	five <- min(which(df$pvalues > .05)) -1 
-	ten <- min(which(df$pvalues > .1)) - 1
-	twenty <- min(which(df$pvalues > .2)) -1
-	
-	list(fdr = fdr, sensitivity = sensitivity,
-		n_found = n_found,
-		n_de = n_de,
-		total_positive = total_positive,
-		total_negative = total_negative, 
-		pvalues = df$pvalues,
+		qvalues = df$qvalues,
 		five=five, ten=ten, twenty=twenty, title=title)
 }
 
 
 average_fdr <- function(fdr_list)
 {
+	#convert list to data frame
 	fdrs <- lapply(fdr_list, function(x)
 		data.frame(fdr = x$fdr,
 		sensitivity = x$sensitivity,
 		n_de = x$n_de,
 		n_found = x$n_found,
-		pvalues = x$pvalues,
+		qvalues = x$qvalues,
 		total_positive = x$total_positive,
 		total_negative = x$total_negative))
 	fdrs <- do.call(rbind, fdrs)
 	print(head(fdrs))
 	print(dim(fdrs))
+	#perform averaging
 	average_fdr <- fdrs %>% group_by(n_de) %>%
 		summarise(fdr = mean(fdr),
-			pvalues = mean(pvalues),
+			qvalues = mean(qvalues),
 			sd_sensitivity= sd(sensitivity),
 			sensitivity = mean(sensitivity),
 			n_found = mean(n_found),
@@ -103,16 +52,16 @@ average_fdr <- function(fdr_list)
 			total_negative = mean(total_negative))
 	print(dim(average_fdr))
 	print(head(average_fdr))	
-	five <- min(which(average_fdr$pvalues > .05)) -1
-        ten <- min(which(average_fdr$pvalues > .1)) - 1
-        twenty <- min(which(average_fdr$pvalues > .2)) -1
+	five <- min(which(average_fdr$qvalues > .05)) -1
+    ten <- min(which(average_fdr$qvalues > .1)) - 1
+    twenty <- min(which(average_fdr$qvalues > .2)) -1
 	
 	list(fdr = average_fdr$fdr,
 		sensitivity = average_fdr$sensitivity,
 		sd_sensitivity = average_fdr$sd_sensitivity,
 		n_found = average_fdr$n_found,
 		n_de = average_fdr$n_de,
-		pvalues = average_fdr$pvalues,
+		qvalues = average_fdr$qvalues,
 		five = five, ten=ten, twenty=twenty,
 		title = fdr_list[[1]]$title,
 		total_positive = average_fdr$total_positive,
@@ -168,16 +117,15 @@ plot_fdrs <- function(fdr1, fdr2 = NULL, fdr3=NULL, fdr4=NULL, fdr5 = NULL,
 	dev.off()
 }
 
-
-averaging <- function(summary_table_list, colname, title, qvalues)
+averaging <- function(summary_table_list, colname, title)
 {
 	i <- which(colnames(summary_table_list[[1]]) == colname)
 	print('column')
 	print(i)
 	print('calculating fdrs for each summary_table')
 	fdrs_list <- lapply(summary_table_list, function(x)
-		calculate_fdr_pval(true_DE = x$de,
-				pvalues = x[,i],
+		calculate_fdr(true_DE = x$de,
+				qvalues = x[,i],
 				title = title))
 	print('running average_fdr on fdr_list')
 	average <- average_fdr(fdrs_list)

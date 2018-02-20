@@ -1,32 +1,49 @@
-
-MinMethod <- function(pvalues)
+filter_func <- function(row)
 {
-	if(length(pvalues) == 0)
-	{
-			return(NA)
-	}
-	pvalues <- pvalues[!is.na(pvalues)]
-	if(length(pvalues) == 0)
-	{
-			return(NA)
-	}
-	n <- length(pvalues)
-	m <- min(pvalues)
-	1 - (1-m) ^ n
+	mean(row) > 0
 }
 
-DESeq <- function(counts, design)
+normalize_tccs <- function(counts)
+{
+		counts <- log(counts + 1)
+		counts <- counts / sum(counts)
+		counts
+}
+
+DESeq_wt <- function(counts, design)
 {
 	#need nsamples =  ncol(count) = nrow(design)
 	DESeqData <- DESeqDataSetFromMatrix(counts, DataFrame(design), ~ factor(design))
-	#DESeqData <- DESeq(DESeqData, test=c("Wald"), fitType='parametric', quiet=FALSE)
 	estimateSizeFactors(DESeqData) -> DESeqData
 	estimateDispersions(DESeqData) -> DESeqData
 	nbinomWaldTest(DESeqData, betaPrior=FALSE)-> DESeqData
-
 	DESeqData
 }
 
+DESeq_lrt <- function(counts, design)
+{
+	DESeqData <- DESeqDataSetFromMatrix(counts, DataFrame(design), ~ factor(design))
+	DESeqData <- estimateSizeFactors(DESeqData)
+	DESeqData <- DESeq2::DESeq(DESeqData, test = 'LRT', reduced = ~1)
+	DESeqData
+}
+
+sleuth_wt_pipeline <- function(so)
+{
+	so <- sleuth_fit(so, ~condition, 'full')
+	so <- sleuth_wt(so, 'condition1', 'full')
+	sleuth_table <- sleuth_results(so, 'condition1', which_model = 'full')
+	sleuth_table
+}
+
+sleuth_lrt_pipeline <- function(so)
+{
+	so <- sleuth_fit(so, ~condition, 'full')
+	so <- sleuth_fit(so, ~1, 'null')
+	so <- sleuth_lrt(so, 'null', 'full')
+	sleuth_table <- sleuth_results(so, 'null:full', 'lrt')
+	sleuth_table
+}
 
 limma <- function(counts, design)
 {
@@ -93,9 +110,20 @@ map_to_gene <- function(i, transcripts, map)
 	list(tcc_id=i, t=t, g=g, unique = unique_g)
 }
 
+#TODO factor this out
 make_tcc_table <- function(tcc2genemap)
 {
 	n <- length(tcc2genemap)
+	#df <- data.frame(pvalues=rep(1.0, n), genes = character(n), stringsAsFactors=FALSE)
+	#for (i in 1:n)
+	#{
+	#	if(length(tcc2gene[[i]]$unique) == 1)
+	#	{
+	#		df[i,2] <- tcc2gene[[i]]$unique
+	#	}
+	#}
+	#df
+
 	table <- sapply(1:n, function(i) check_unambiguous(tcc2genemap[[i]]))
 	table <- unlist(table)
 	table <- matrix(table, ncol=2, byrow=TRUE)
@@ -135,54 +163,4 @@ filter_all_nonunique <- function(tcc2gene, genes)
 	}
 	genes_table
 }
-
-
-fisher <- function(pvalues)
-{
-	pvalues <- pvalues[!is.na(pvalues)]
-	if(length(pvalues)==0)
-	{
-		return (NA)
-	}
-	chisq = -2 * sum(log(pvalues))
-	df <- 2* length(pvalues)
-	pchisq(chisq, df, lower.tail = FALSE)
-}
-
-lancaster <- function(pvalues, weights)
-{
-	weights <- weights[!is.na(pvalues)]
-	pvalues <- pvalues[!is.na(pvalues)]
-	pvalues <- pvalues[weights>0]
-	weights <- weights[weights>0]
-	
-	if(length(weights) != length(pvalues))
-	{
-		print('error, weights not equal to pvalues')
-	}
-
-	if(length(pvalues) == 0)
-	{
-		return(NA)
-	}
-	if(!any(weights))
-	{
-		return(NA)
-	}
-	if(length(pvalues) == 1)
-	{
-		return(pvalues)
-	}
-	t <- sapply(1:length(pvalues), function(i) lts(pvalues[i], weights[i]))
-	t <- sum(t)
-	p <- pchisq(t, sum(weights), lower.tail=FALSE) 
-	return(p)
-}
-
-lts <- function(pvalue, weight)
-{
-	qgamma(pvalue, shape = weight /2, scale = 2, lower.tail=FALSE)
-}
-
-
 

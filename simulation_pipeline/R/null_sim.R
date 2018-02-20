@@ -1,7 +1,6 @@
+#simulated p-values under the null
+
 library(dplyr)
-
-
-
 calculate_fdr_min <- function(pval, pvalues, n)
 {
 	if(length(pvalues) != length(n))

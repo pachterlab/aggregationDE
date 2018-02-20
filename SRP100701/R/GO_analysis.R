@@ -1,43 +1,50 @@
-
 library(topGO)
 library(stats)
 library(dplyr)
 library(ggplot2)
-source('../R/aggregation.R')
+library(aggregation)
+
+source('~/TCC/misc.R')
 base_dir <- '/home/lynnyi/SRP100701'
 
 print('reading files')
-results <- readRDS(file.path(base_dir, 'transcript_pipeline_results.rds'))
-gene_pipeline_results <-readRDS(file.path(base_dir, 'gene_pipeline_results.rds'))
-tcc_pipeline_results <- readRDS(file.path(base_dir, 'tcc_pipeline_results.rds'))
-tcc_table <- readRDS(file.path(base_dir, 'tcc_table.rds'))
+results <- readRDS(file.path(base_dir, 'wt', 'tx_results.rds'))
+gene_pipeline_results <-readRDS(file.path(base_dir, 'wt', 'gene_results.rds'))
+tcc_pipeline_results <- readRDS(file.path(base_dir, 'wt', 'tcc_results.rds'))
+tcc_table <- readRDS(file.path(base_dir, 'wt', 'tcc_table.rds'))
 
 print('reformatting tables')
 gene_pipeline_results <- mutate(gene_pipeline_results, genes = target_id, gene_pval = pval, gene_qval = qval)
 gene_pipeline_results$genes <- gsub('\\..*', '', gene_pipeline_results$genes)
-gene_pipeline_results <- select(gene_pipeline_results, genes, gene_pval, gene_qval)
-
+gene_pipeline_results <- dplyr::select(gene_pipeline_results, genes, gene_pval, gene_qval)
 
 #convert ENSMUG names with period to that without
 results$genes <- gsub('\\..*', '', results$genes)
-results <- mutate(results, tx_lan_pval = lan, tx_min_pval = min, tx_lan_qval = lan.adjust, tx_min_qval = min.adjust)
-results <- select(results, genes, tx_lan_pval, tx_min_pval, tx_lan_qval, tx_min_qval)
+results <- dplyr::mutate(results, tx_lan_pval = lan, tx_min_pval = min, tx_lan_qval = lan.adjust, tx_min_qval = min.adjust)
+results <- dplyr::select(results, genes, tx_lan_pval, tx_min_pval, tx_lan_qval, tx_min_qval)
 
 tcc_pipeline_results <- tcc_pipeline_results[order(tcc_pipeline_results$genes),]
 tcc_pipeline_results <- mutate(tcc_pipeline_results, tcc_pval = pval, tcc_qval = qval)
-tcc_pipeline_results <- select(tcc_pipeline_results, genes, tcc_pval, tcc_qval)
+tcc_pipeline_results <- dplyr::select(tcc_pipeline_results, genes, tcc_pval, tcc_qval)
 
 print('final_merge')
 results <- merge(results, gene_pipeline_results, by = 'genes', all.x = TRUE)
 results <- merge(results, tcc_pipeline_results, by ='genes', all.x = TRUE)
 results <- results[ order(results$genes), ]
+print(head(results))
+
+png(file.path(base_path, 'wt', 'plots', 'pval_scatter.png'), height = 5000, width = 5000, res = 1200)
+p <- ggplot(data = results, aes(x=-log(tcc_pval), y=-log(gene_pval))) + geom_point(alpha = .1) + xlab('Lancaster TCC (-log(p-value))') + ylab('Gene Counts (-log(p-value))')
+print(p)
+dev.off()
+
 
 print('calculating weights')
 weights_table <- tcc_table %>% group_by(genes) %>% summarise(weight = sum(meancounts))
 weights_table <- weights_table[order(weights_table$genes),]
 weights_table <- weights_table[-1,]
 weights_table$genes <- as.character(weights_table$genes)
-
+print(head(weights_table))
 if(!all.equal(weights_table$genes, results$genes))
 {
 	print('ERROR: not all equal')
@@ -89,6 +96,7 @@ do_agg_analysis <- function(gene_names, pval, weight, go_map = NULL, method_name
 	all_genes <- get_tgd_genes(unique(gene_names), c(0, rep(1, length(unique(gene_names))-1)))
 	tgd <- new( "topGOdata", ontology='BP', allGenes = all_genes, nodeSize=5,
 	   annot=annFUN.org, mapping="org.Mm.eg.db", ID = "ensembl" )
+	#git contains the genes in the GO term
 	git <- genesInTerm(tgd)
 	print('performing aggregation')
 	my_go_pval <- sapply(seq_along(git), function(i) map_GO(results, git[[i]]))
@@ -107,12 +115,12 @@ map_GO<- function(results_table, go_genes)
 }
 
 print('doing classical analyses')
-lan_tx <- do_classical_analysis(results$genes, results$tx_lan_qval, 'Lancaster Tx')
-min_tx <- do_classical_analysis(results$genes, results$tx_min_qval, 'Sidak Tx')
 gene <- do_classical_analysis(results$genes, results$gene_qval, 'Gene')
-tcc <- do_classical_analysis(results$genes, results$tcc_qval, 'TCC')
+min_tx <- do_classical_analysis(results$genes, results$tx_min_qval, 'Sidak Tx')
+lan_tx <- do_classical_analysis(results$genes, results$tx_lan_qval, 'Lancaster Tx')
+tcc <- do_classical_analysis(results$genes, results$tcc_qval, 'Lancaster TCC')
 
-go_map <- select(lan_tx, GO.ID, Term)
+go_map <- dplyr::select(lan_tx, GO.ID, Term)
 print('doing new analyses')
 lan_tx_new <- do_agg_analysis(results$genes, results$tx_lan_pval, weights_table$weight, go_map, 'Aggregate GO Lancaster Tx')
 tcc_new <- do_agg_analysis(results$genes, results$tcc_pval, weights_table$weight, go_map, 'Aggregate GO Lancaster TCC')
@@ -152,14 +160,14 @@ plot_go_results <- function(go_results, term)
 	filter_ids <- filter_func(go_results)
 	filter_ids <- filter_ids[!is.na(filter_ids)]
 	go_results <- filter(go_results, GO.ID %in% filter_ids)
-	
+	go_results$method <- factor(go_results$method, levels = c(1, 4, 3, 2))	
 	p <- ggplot(go_results, aes(Term, logp)) + geom_bar(aes(fill=method), position='dodge', stat='identity')
 	p <- p + theme(axis.text.x=element_text(angle=-90, hjust=0))
 	p <- p + geom_hline(yintercept = -log(.05, base=10))
 	p <- p + annotate('text', go_results$Term[[5]], -log(.1, base=10), label='0.05 FWER')
 	p <- p + xlab('GO Term')
-	p <- p + ylab('-log(p-value)')
-	png('~/GO.png', width = 10000, height = 7000, res=1200)
+	p <- p + ylab('-log(FWER)')
+	png(file.path(base_dir, 'wt', 'plots', 'classical.png'), width = 10000, height = 7000, res=1200)
 	print(p)
 	dev.off()
 }
@@ -191,25 +199,31 @@ plot_scatter <- function(table1, table2)
 	terms <- as.numeric(1:nrow(data) %in% x)
 	data$Terms <- as.factor(terms)
 	data <- data[order(data$Terms),]
-	png('~/scattergo.png', width=10000, height = 8000, res = 1200)
+	png(file.path(base_dir,'wt','plots','scatter.png'), width=10000, height = 8000, res = 1200)
 	p <- ggplot() + geom_point(data = data, aes(x=fwer.x, y = fwer.y, colour=Terms)) + 
 			scale_colour_manual(values=c(rgb(0,0,0,.1), rgb(1,0,0,.7)),
 								labels = c('GO Terms without "immune"', 
 										   'GO Terms with "immune"'))
-	p <- p + xlab(paste0('Enrichment Test (p-value)')) + ylab(paste0('Perturbation Test (p-value)'))
+	p <- p + xlab(paste0('Enrichment Test (FWER)')) + ylab(paste0('Perturbation Test (FWER)'))
 	print(p)
 	dev.off()
 }
 
+all_go_results <- list(gene, min_tx, lan_tx, tcc, lan_tx_new, gene_new, min_tx_new, tcc_new)
+saveRDS(all_go_results, file.path(base_dir, 'wt', 'all_go_results.rds'))
 
 print('plotting go results')
-go_results <- list(lan_tx, min_tx, gene, tcc)
+go_results <- list(gene, min_tx, lan_tx, tcc)
 plot_go_results(go_results, 'immune')
-
 print('plot scatter')
+plot_scatter(tcc, tcc_new)
+print('calculate enrichment')
+enrichments <- lapply(all_go_results, function(x) calculate_enrichment(x, 'immune'))
 
-
-go_results <- list(tcc, tcc_new)
-enrichments <- lapply(go_results, function(x) calculate_enrichment(x, 'immune'))
-enp <- sapply(enrichments_1, function(x) x$p.value)
+#correlation <- data.frame(lan_tx = lan_tx$Fisher.classic,
+#						  min_tx = min_tx$Fisher.classic,
+#						  gene=gene$Fisher.classic,
+#						  tcc = tcc$Fisher.classic)
+#cor_matrix <- cor(correlation, method = 'spearman')
+#melted_cormat <- melt(cor_matrix)
 
